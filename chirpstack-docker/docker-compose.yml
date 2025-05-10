@@ -1,0 +1,217 @@
+version: "3" 
+
+  
+
+services: 
+
+  chirpstack-network-server: 
+
+    image: chirpstack/chirpstack-network-server:3 
+
+    volumes: 
+
+      - ./configuration/chirpstack-network-server:/etc/chirpstack-network-server 
+
+    depends_on: 
+
+      - postgresql 
+
+      - mosquitto 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+  chirpstack-application-server: 
+
+    image: chirpstack/chirpstack-application-server:3 
+
+    ports: 
+
+      - 8080:8080 
+
+    volumes: 
+
+      - ./configuration/chirpstack-application-server:/etc/chirpstack-application-server 
+
+    depends_on: 
+
+      - chirpstack-network-server 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+  chirpstack-gateway-bridge: 
+
+    image: chirpstack/chirpstack-gateway-bridge:3 
+
+    ports: 
+
+      - 1700:1700/udp 
+
+    volumes: 
+
+      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge 
+
+    depends_on: 
+
+      - mosquitto 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+  postgresql: 
+
+    image: postgres:9.6-alpine 
+
+    environment: 
+
+      - POSTGRES_PASSWORD=root 
+
+    volumes: 
+
+      - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d 
+
+      - postgresqldata:/var/lib/postgresql/data 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+  redis: 
+
+    image: redis:5-alpine 
+
+    volumes: 
+
+      - redisdata:/data 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+  mosquitto: 
+
+    image: eclipse-mosquitto:2 
+
+    ports: 
+
+      - 1883:1883 
+
+    volumes: 
+
+      - ./configuration/eclipse-mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+  influxdb: 
+
+    image: influxdb:1.8 
+
+    environment: 
+
+      - INFLUXDB_DB=chirpstack 
+
+      - INFLUXDB_USER=chirpuser 
+
+      - INFLUXDB_PASSWORD=chirppass 
+
+      - INFLUXDB_ADMIN_USER=admin 
+
+      - INFLUXDB_ADMIN_PASSWORD=adminpass 
+
+    volumes: 
+
+      - influxdb-storage:/var/lib/influxdb 
+
+    ports: 
+
+      - 8086:8086 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+  telegraf: 
+
+    image: telegraf:1.26 
+
+    volumes: 
+
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro 
+
+    depends_on: 
+
+      - mosquitto 
+
+      - influxdb 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+  grafana: 
+
+    image: grafana/grafana:latest 
+
+    environment: 
+
+      - GF_SECURITY_ADMIN_USER=admin 
+
+      - GF_SECURITY_ADMIN_PASSWORD=admin 
+
+    volumes: 
+
+      - grafana-storage:/var/lib/grafana 
+
+    ports: 
+
+      - "3000:3000" 
+
+    depends_on: 
+
+      - influxdb 
+
+    networks: 
+
+      - chirp-net 
+
+  
+
+volumes: 
+
+  postgresqldata: 
+
+  redisdata: 
+
+  influxdb-storage: 
+
+  grafana-storage: 
+
+  
+
+networks: 
+
+  chirp-net: 
+
+    external: true 
